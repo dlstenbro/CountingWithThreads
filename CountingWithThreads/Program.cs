@@ -49,7 +49,7 @@ namespace CountingWithThreads
             List<Thread> threads = new List<Thread>();
 
             string file_name = "sample-book.txt";
-            string file_path = $"{Environment.CurrentDirectory}\\{file_name}";
+            string file_path = Path.Combine(Environment.CurrentDirectory, file_name);
             int number_of_threads = 1;
 
             FileInfo fi = new FileInfo(file_name);
