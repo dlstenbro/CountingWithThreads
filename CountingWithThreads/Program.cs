@@ -1,5 +1,7 @@
-﻿using System.Collections;
-using System.Text;
+﻿using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using CountingWithThreads.Models;
 
 namespace CountingWithThreads
 {
@@ -12,25 +14,49 @@ namespace CountingWithThreads
      */
     public static class Program
     {
-        public static void ThreadProcess(int thread_number, string file_path, int start, long totalChunkSize, int buffer_size = 1028)
+        public static WordList wordlist = new WordList();
+        public static void CountWords(string content)
+        {
+            // clean up the unicode chunks by only accepting characters
+            // under https://www.ssec.wisc.edu/~tomw/java/unicode.html
+            // if they don't fit between the range, replace with a space character.
+            content = Regex.Replace(content, @"[^\u0041-\u005A\u0061-\u007A]+", " ");
+
+            foreach (string w in content.Split(" ", StringSplitOptions.TrimEntries))
+            {
+                if (!wordlist.Entries.TryAdd(w, 1))
+                {
+                    wordlist.Entries[w] += 1;
+                }
+
+            }
+        }
+
+        public static void Run(int thread_number, string file_path, int start, long totalChunkSize, int buffer_size = 1028)
         {
             var watch = new System.Diagnostics.Stopwatch();
             watch.Start();
 
             FileStream thread_file = File.Create($"{thread_number}.txt");
 
+            Console.WriteLine($"running thread # {thread_number} : {start} {totalChunkSize}");
+
             using (FileStream fs = File.OpenRead(file_path))
             {
                 int bytes = 0;
+                long bytes_read = 0;
 
                 fs.Seek(start, SeekOrigin.Begin);
 
                 byte[] buffer = new byte[totalChunkSize];
                 UTF8Encoding temp = new UTF8Encoding(true);
 
-                long bytes_read = 0;
                 while (bytes_read < totalChunkSize && (bytes = fs.Read(buffer, 0, buffer.Length)) > 0)
                 {
+                    string content = Encoding.UTF8.GetString(buffer);
+
+                    CountWords(content);
+
                     thread_file.Write(buffer, 0 , bytes);
                     bytes_read += bytes;
                 }
@@ -58,12 +84,6 @@ namespace CountingWithThreads
 
             number_of_threads = int.Parse(Console.ReadLine() ?? "1");
 
-            Dictionary<string, ArrayList> data = new Dictionary<string, ArrayList>()
-            {
-                { "words", new ArrayList() }
-            };
-
-
             long bytes_per_thread = fi.Length / number_of_threads;
 
             Console.WriteLine($"total sizes (bytes): {fi.Length}\n");
@@ -74,14 +94,17 @@ namespace CountingWithThreads
             for(long i = 0; (fi.Length - (i + bytes_per_thread)) >= 0 ; i = i + bytes_per_thread)
             {
                 var start = i;
-                var end = i + bytes_per_thread - 1;
-                Console.WriteLine($"{start} {end}");
-                Thread t = new Thread(() => ThreadProcess(thread_number += 1, file_path, (int)start, bytes_per_thread));
+                Thread t = new Thread(() => Run(thread_number += 1, file_path, (int)start, bytes_per_thread));
                 threads.Add(t);
             }
 
             threads.ForEach(t => t.Start());
             threads.ForEach(t => t.Join());
+
+            JsonDocument js = JsonDocument.Parse(JsonSerializer.Serialize(wordlist));
+
+            string output = Path.Combine(Environment.CurrentDirectory, "sample-book-words.json");
+            File.WriteAllText(output, js.RootElement.GetRawText().Replace(Environment.NewLine, ""));
         }
     }
 }
