@@ -1,7 +1,10 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CountingWithThreads.Models;
+using Microsoft.VisualBasic;
 
 namespace CountingWithThreads
 {
@@ -28,7 +31,6 @@ namespace CountingWithThreads
                 {
                     wordlist.Entries[w] += 1;
                 }
-
             }
         }
 
@@ -66,7 +68,7 @@ namespace CountingWithThreads
             watch.Stop();
 
             Console.WriteLine($"{thread_number} finished in {watch.Elapsed}");
-            Thread.Sleep(5000);
+            
         }
 
         public static void Main()
@@ -101,7 +103,15 @@ namespace CountingWithThreads
             threads.ForEach(t => t.Start());
             threads.ForEach(t => t.Join());
 
-            JsonDocument js = JsonDocument.Parse(JsonSerializer.Serialize(wordlist));
+            //convert wordlist to a list with dictionary entries
+            // the output will look friendly converting to json
+            var entryList = wordlist.Entries.Select(kvp => new Entry { word = kvp.Key, count = kvp.Value }).ToList();
+            Dictionary<string, List<Entry>> cleanoutput = new Dictionary<string, List<Entry>>()
+            {
+                {  "words", entryList }
+            };
+
+            JsonDocument js = JsonDocument.Parse(JsonSerializer.Serialize(cleanoutput));
 
             string output = Path.Combine(Environment.CurrentDirectory, "sample-book-words.json");
             File.WriteAllText(output, js.RootElement.GetRawText().Replace(Environment.NewLine, ""));

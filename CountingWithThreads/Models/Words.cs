@@ -2,6 +2,11 @@
 
 namespace CountingWithThreads.Models
 {
+    public class Entry
+    {
+        public string word { get; set; }
+        public int count { get; set; }
+    }
     public class WordList
     {
         private ConcurrentDictionary<string, int> entries;
